@@ -59,7 +59,7 @@ password: "YOUR_PASSWORD_HERE",
 |------|------|----------|
 | 🎓 校园网 & 文献下载 | 需走校园 IP 出口才能识别授权 | 域名直连 + 系统 DNS |
 | 🤖 海外 AI 服务 | ChatGPT / Claude / Gemini 等被封锁 | 走自建或订阅节点 |
-| 🇨🇳 国产 AI | DeepSeek / Kimi / 豆包 等 | 直连，避免绕路 |
+| 🐉 国产 AI | DeepSeek / Kimi / 豆包 等 | 直连，避免绕路 |
 | 🎮 Steam & 游戏加速器 | 避免与 TUN 冲突 | 进程排除 + 域名直连 |
 | 🏠 内网设备 | 访问 NAS / 打印机 / 路由器 | 局域网 CIDR 直连 |
 | 🔒 隐私保护 | 防 IPv6 泄漏、hosts 污染 | 强制关闭 IPv6 DNS |
@@ -76,8 +76,8 @@ password: "YOUR_PASSWORD_HERE",
 
 1. 打开 **Clash Verge Rev**
 2. 进入 **「订阅」** 页面
-3. 右键你的订阅 → **「编辑全局扩展脚本」**
-4. 粘贴脚本内容
+3. 右键 **「全局扩展脚本 Script」** 编辑文件
+4. 粘贴覆盖脚本内容
 
 ### 3. 配置节点信息
 
@@ -89,9 +89,7 @@ password: "YOUR_PASSWORD_HERE",
 
 ### 4. 启用脚本
 
-- 保存脚本
-- 订阅页 → **「重新应用」**
-- 代理列表中选择 `🤖 AI专属分流` → 指定希望使用的海外节点
+- 保存 **「全局扩展脚本 Script」** 即可自动启用
 
 ---
 
@@ -99,7 +97,7 @@ password: "YOUR_PASSWORD_HERE",
 
 - **客户端**：[Clash Verge Rev](https://github.com/clash-verge-rev/clash-verge-rev)
 - **模式**：规则模式 + TUN（虚拟网卡）
-- **建议开启**：开机自启、绕过局域网
+- **建议开启**：开机自启
 - **默认节点协议**：Hysteria2（可替换为任意协议，见下文）
 
 ---
