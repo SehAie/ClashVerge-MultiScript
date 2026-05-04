@@ -8,6 +8,9 @@
 ![Platform](https://img.shields.io/badge/platform-Clash%20Verge%20Rev-green)
 ![Language](https://img.shields.io/badge/language-JavaScript-yellow)
 
+## Related Repositories
+[VPS-Builder](https://github.com/SehAie/VPS-Builder) - 🚀 一键部署 VPS 的 Windows 命令行工具 | A Windows CLI tool to bootstrap VPS
+
 ---
 
 ## 📖 目录
