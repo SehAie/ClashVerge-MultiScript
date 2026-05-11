@@ -1,12 +1,13 @@
-# Clash Verge Rev 全局覆盖脚本
+# Clash Verge Rev 全局覆盖脚本 · v2.0
 
-> 针对 **校园网 / 文献下载 / AI 分流 / Steam & 游戏加速器** 共存场景的 Clash Verge Rev 覆盖脚本。
-> 
-> A Clash Verge Rev override script for CN campus network, academic databases, AI routing, and game accelerator coexistence.
+> 针对 **校园网 / 文献下载 / AI 分流 / Steam & 游戏加速器 / CF风控绕过** 共存场景的 Clash Verge Rev 覆盖脚本。
+>
+> A Clash Verge Rev override script for CN campus network, academic databases, AI routing, game accelerator coexistence & Cloudflare challenge bypass.
 
 ![License](https://img.shields.io/badge/license-MIT-blue)
 ![Platform](https://img.shields.io/badge/platform-Clash%20Verge%20Rev-green)
 ![Language](https://img.shields.io/badge/language-JavaScript-yellow)
+![Version](https://img.shields.io/badge/version-2.0-orange)
 
 ## Related Repositories
 [VPS-Builder](https://github.com/SehAie/VPS-Builder) - 🚀 一键部署 VPS 的 Windows 命令行工具 | A Windows CLI tool to bootstrap VPS
@@ -15,6 +16,7 @@
 
 ## 📖 目录
 
+- [🆕 v2.0 更新说明](#-v20-更新说明)
 - [⚠️ 使用前必读](#️-使用前必读)
 - [✨ 功能特性](#-功能特性)
 - [🚀 快速开始](#-快速开始)
@@ -31,6 +33,65 @@
 - [🤝 贡献](#-贡献)
 - [📄 License](#-license)
 - [⚠️ 免责声明](#️-免责声明)
+
+---
+
+## 🆕 v2.0 更新说明
+
+> **发布于 2026-05-11**
+
+### 重大更新
+
+| 更新项 | 说明 |
+|--------|------|
+| 🔒 **CF 风控域名分流** | 新增 Cloudflare Turnstile / Google reCAPTCHA 等验证码域名的独立分流规则，走 VPS 出口避免国别检测冲突，置顶规则压过订阅内误匹配 |
+| 📚 **文献数据库翻倍扩展** | 新增 PNAS、皇家学会、冷泉港、Karger、Hindawi、De Gruyter、Emerald、Cell Press、JAMA Network、Rockefeller 等 20+ 学术出版平台 |
+| ⚡ **规则优先级重组** | CF 风控域名升至最高优先级（优于局域网），确保不被订阅规则覆盖 |
+| 🧹 **代码结构化优化** | 分模块 12 步编号，注释更清晰，方便按模块查找和维护 |
+
+### 详细变更
+
+**1. CF 风控 & 验证码域名分流（新增）**
+
+问题：订阅规则常将 `challenges.cloudflare.com` 误分配到 `🐟 Copilot` 等规则，导致 CF Turnstile 验证码加载异常，部分海外网站无限循环人机验证。
+
+方案：新增 `cfChallengeDomains` 数组（7 个域名），覆盖 Cloudflare Turnstile、CF Telemetry、Google reCAPTCHA 及 `gstatic.com` 依赖资源，统一走 `🤖 AI专属分流`（VPS 出口），规则置顶优先于订阅所有规则。
+
+```js
+const cfChallengeDomains = [
+  "challenges.cloudflare.com",      // Cloudflare Turnstile
+  "nel.cloudflare.com",             // CF 遥测（参与风控指纹）
+  "cloudflareinsights.com",         // CF 遥测
+  "recaptcha.net",                  // Google reCAPTCHA
+  "www.recaptcha.net",
+  "gstatic.com",                    // reCAPTCHA 依赖资源
+  "www.gstatic.com"
+];
+```
+
+**2. 文献数据库扩展（v1 → v2）**
+
+新增 20+ 顶级学会及中型出版平台域名：
+
+```
+PNAS (pnas.org) · 皇家学会 (royalsocietypublishing.org)
+生理学会 (physiology.org) · 微生物学会 (asm.org)
+综述期刊 (annualreviews.org) · 数学学会 (ams.org)
+经济学会 (aeaweb.org) · Karger · Hindawi
+De Gruyter · Emerald · 冷泉港 (cshlp.org / cshlpress.com)
+洛克菲勒出版社 (rupress.org)
+```
+
+v1 文献域名 ~70 个 → v2 文献域名 **~95 个**，覆盖从预印本（arxiv / biorxiv）到顶级期刊（Nature / Science / Cell / NEJM / Lancet / JAMA / PNAS）的完整学术链路。
+
+**3. 规则优先级重组**
+
+```
+v1:  局域网 → 教育 → 文献 → Steam → 进程 → 国产AI → 海外AI
+v2:  CF验证 ⚡ → 局域网 → 教育 → 文献 → Steam → 进程 → 国产AI → 海外AI
+```
+
+CF 风控规则升至最顶层，避免被订阅内 `DOMAIN-SUFFIX,challenges.cloudflare.com,🐟 Copilot` 等规则覆盖。
 
 ---
 
@@ -57,6 +118,7 @@ password: "YOUR_PASSWORD_HERE",
 
 | 场景 | 需求 | 解决方案 |
 |------|------|----------|
+| 🔒 CF 风控绕过 | Turnstile / reCAPTCHA 国别检测 | VPS 出口统一分流，置顶规则 |
 | 🎓 校园网 & 文献下载 | 需走校园 IP 出口才能识别授权 | 域名直连 + 系统 DNS |
 | 🤖 海外 AI 服务 | ChatGPT / Claude / Gemini 等被封锁 | 走自建或订阅节点 |
 | 🐉 国产 AI | DeepSeek / Kimi / 豆包 等 | 直连，避免绕路 |
@@ -105,16 +167,20 @@ password: "YOUR_PASSWORD_HERE",
 ## 🏗️ 架构概览
 
 ```
-┌──────────────────────────────────────┐
-│        全局覆盖脚本（main 函数）      │
-├──────────────────────────────────────┤
-│  1. 基础优化（store-selected / DNS） │
-│  2. TUN 排除进程（游戏加速器）        │
-│  3. 注入自建节点（默认 Hysteria2）    │
-│  4. 创建 AI 专属策略组                │
-│  5. 合并自定义规则 → 订阅规则         │
-│  6. DNS 增强（fake-ip-filter）       │
-└──────────────────────────────────────┘
+┌──────────────────────────────────────────────────┐
+│         全局覆盖脚本（main 函数）v2.0             │
+├──────────────────────────────────────────────────┤
+│  1. 基础优化（store-selected / DNS）              │
+│  2. TUN 排除进程（游戏加速器）                     │
+│  3. 注入自建节点（默认 Hysteria2）                 │
+│  4. 创建 AI 专属策略组                             │
+│  5. 域名清单定义（海外AI / 国产AI / 教育 / 文献）   │
+│  6. CF 风控域名分流（🆕）                          │
+│  7. Steam & 加速器直连（域名 + 进程名）             │
+│  8. 局域网保护（CIDR 直连）                        │
+│  9. 规则优先级合并 → 订阅规则                      │
+│ 10. DNS 增强（fake-ip-filter + nameserver-policy） │
+└──────────────────────────────────────────────────┘
 ```
 
 ---
@@ -151,17 +217,31 @@ config.dns.ipv6 = false;                  // 禁用 IPv6 DNS，防泄漏
 
 > 💡 **不含 DIRECT**，避免因误选导致 AI 请求走本地泄漏身份；`REJECT` 提供紧急熔断。
 
+### CF 风控 & 验证码域名分流 🆕
+
+**为什么需要？** 订阅规则常将 `challenges.cloudflare.com` 误分配到 `🐟 Copilot` 等不相关的规则，导致 CF Turnstile 验证码加载异常，部分海外网站出现无限循环人机验证。
+
+**解决方案：** 将 Cloudflare Turnstile / Google reCAPTCHA 及其依赖资源从订阅规则中独立出来，统一走 VPS 出口，且规则**置顶**（高于局域网）确保不会被订阅规则覆盖。
+
+| 域名 | 用途 |
+|------|------|
+| `challenges.cloudflare.com` | Cloudflare Turnstile 验证 |
+| `nel.cloudflare.com` / `cloudflareinsights.com` | CF 遥测（参与风控指纹） |
+| `recaptcha.net` / `www.recaptcha.net` | Google reCAPTCHA 服务 |
+| `gstatic.com` / `www.gstatic.com` | reCAPTCHA 静态资源依赖 |
+
 ### 域名分流清单
 
-| 列表 | 走向 | 说明 |
-|------|------|------|
-| `aiDomainsOverseas` | 🤖 AI专属分流 | OpenAI / Claude / Gemini / Grok / Perplexity / HuggingFace 等 |
-| `aiDomainsCN` | DIRECT | DeepSeek / Kimi / 通义 / 文心 / 豆包 / 混元 等 |
-| `eduDomains` | DIRECT + 系统 DNS | edu.cn / cernet 等教育网 |
-| `literatureDomains` | DIRECT + 系统 DNS | 知网、万方、WOS、Elsevier、Springer、IEEE、PubMed 等 |
-| `steamDomains` | DIRECT | Steam 平台域名（含 `DOMAIN-KEYWORD,steam`） |
-| `directProcesses` | DIRECT | 游戏加速器进程名 |
-| `lanCIDRs` / `lanCIDRs6` | DIRECT（no-resolve） | 内网 IPv4/IPv6 段 |
+| 列表 | 走向 | 域名数 | 说明 |
+|------|------|--------|------|
+| `cfChallengeDomains` 🆕 | 🤖 AI专属分流 | 7 | CF Turnstile / reCAPTCHA 风控域名 |
+| `aiDomainsOverseas` | 🤖 AI专属分流 | ~40 | OpenAI / Claude / Gemini / Grok / Perplexity / HuggingFace 等 |
+| `aiDomainsCN` | DIRECT | ~35 | DeepSeek / Kimi / 通义 / 文心 / 豆包 / 混元 等 |
+| `eduDomains` | DIRECT + 系统 DNS | 5 | edu.cn / cernet 等教育网 |
+| `literatureDomains` | DIRECT + 系统 DNS | ~95 | 知网、万方、WOS、Elsevier、Springer、IEEE、PubMed、PNAS、Cell、JAMA 等 |
+| `steamDomains` | DIRECT | 9 | Steam 平台域名（含 `DOMAIN-KEYWORD,steam`） |
+| `directProcesses` | DIRECT | 17 | 游戏加速器进程名 |
+| `lanCIDRs` / `lanCIDRs6` | DIRECT（no-resolve） | 6 / 3 | 内网 IPv4/IPv6 段 |
 
 ### DNS 增强
 
@@ -179,14 +259,15 @@ nameserver-policy  → 教育 / 文献域名强制使用「系统 DNS」
 脚本使用 `concat` 把自定义规则放在订阅规则**最前面**，压过订阅尾部的 `MATCH` 兜底规则：
 
 ```
-① 局域网 IP-CIDR（no-resolve）
-② 教育网域名 DIRECT
-③ 文献库域名 DIRECT
-④ Steam 域名 DIRECT + DOMAIN-KEYWORD,steam
-⑤ 进程名直连（Steam + 加速器）
-⑥ 国产 AI DIRECT
-⑦ 海外 AI → 🤖 AI专属分流
-⑧ ────── 以下为订阅原规则 ──────
+① CF 风控 & 验证码 → 🤖 AI专属分流   🆕 置顶！压过订阅规则
+② 局域网 IP-CIDR（no-resolve）
+③ 教育网域名 DIRECT
+④ 文献库域名 DIRECT
+⑤ Steam 域名 DIRECT + DOMAIN-KEYWORD,steam
+⑥ 进程名直连（Steam + 加速器）
+⑦ 国产 AI DIRECT
+⑧ 海外 AI → 🤖 AI专属分流
+⑨ ────── 以下为订阅原规则 ──────
 ```
 
 ---
@@ -243,7 +324,7 @@ config.proxies.unshift({
   type: "ss",
   server: "YOUR_SERVER_IP",
   port: 8388,
-  cipher: "aes-256-gcm",   // 常见: aes-128-gcm / chacha20-ietf-poly1305
+  cipher: "aes-256-gcm",
   password: "YOUR_PASSWORD",
   udp: true
 });
@@ -481,6 +562,14 @@ const aiDomainsOverseas = [
 2. 测试节点延迟是否正常
 3. 检查 `chatgpt.com` 规则是否匹配到该策略组
 
+### ❌ CF Turnstile 验证码无限循环 🆕
+
+**原因**：`challenges.cloudflare.com` 被订阅规则误分配到国内出口，CF 检测到国别不一致导致拒绝。
+**排查**：
+1. Clash 的 **连接** 页搜索 `challenges.cloudflare`，确认是否匹配到 `🤖 AI专属分流`
+2. 确认 `🤖 AI专属分流` 选择了海外节点（非 REJECT）
+3. 若仍异常，检查订阅规则中是否有 `DOMAIN,challenges.cloudflare.com` 覆盖了脚本规则（脚本已置顶，理论上不会）
+
 ### ❌ 节点注入失败 / 启动报错
 
 **排查**：
@@ -527,6 +616,7 @@ const aiDomainsOverseas = [
 
 - 新增文献数据库域名
 - 新增 AI 服务域名
+- 新增 CF 风控相关域名
 - 新增游戏加速器进程名
 - 其他协议模板 / 分流场景
 
