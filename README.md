@@ -1,4 +1,4 @@
-# Clash Verge Rev 全局覆盖脚本 · v2.0
+# Clash Verge Rev 全局覆盖脚本 · v3.0
 
 > 针对 **校园网 / 文献下载 / AI 分流 / Steam & 游戏加速器 / CF风控绕过** 共存场景的 Clash Verge Rev 覆盖脚本。
 >
@@ -7,7 +7,7 @@
 ![License](https://img.shields.io/badge/license-MIT-blue)
 ![Platform](https://img.shields.io/badge/platform-Clash%20Verge%20Rev-green)
 ![Language](https://img.shields.io/badge/language-JavaScript-yellow)
-![Version](https://img.shields.io/badge/version-2.0-orange)
+![Version](https://img.shields.io/badge/version-3.0-orange)
 
 ## Related Repositories
 [VPS-Builder](https://github.com/SehAie/VPS-Builder) - 🚀 一键部署 VPS 的 Windows 命令行工具 | A Windows CLI tool to bootstrap VPS
@@ -16,7 +16,7 @@
 
 ## 📖 目录
 
-- [🆕 v2.0 更新说明](#-v20-更新说明)
+- [🆕 v3.0 更新说明](#-v30-更新说明)
 - [⚠️ 使用前必读](#️-使用前必读)
 - [✨ 功能特性](#-功能特性)
 - [🚀 快速开始](#-快速开始)
@@ -36,62 +36,51 @@
 
 ---
 
-## 🆕 v2.0 更新说明
+## 🆕 v3.0 更新说明
 
-> **发布于 2026-05-11**
+> **发布于 2026-06-22**
 
 ### 重大更新
 
 | 更新项 | 说明 |
 |--------|------|
-| 🔒 **CF 风控域名分流** | 新增 Cloudflare Turnstile / Google reCAPTCHA 等验证码域名的独立分流规则，走 VPS 出口避免国别检测冲突，置顶规则压过订阅内误匹配 |
-| 📚 **文献数据库翻倍扩展** | 新增 PNAS、皇家学会、冷泉港、Karger、Hindawi、De Gruyter、Emerald、Cell Press、JAMA Network、Rockefeller 等 20+ 学术出版平台 |
-| ⚡ **规则优先级重组** | CF 风控域名升至最高优先级（优于局域网），确保不被订阅规则覆盖 |
-| 🧹 **代码结构化优化** | 分模块 12 步编号，注释更清晰，方便按模块查找和维护 |
+| 🧠 **fake-ip DNS 分层重构** | 启用 fake-ip 模式，国内/私有/文献/教育/Steam/验证码域名走 real-ip + system DNS，海外 AI 域名保留 fake-ip 并进入专属出口 |
+| 🛰️ **域名嗅探增强** | 开启 HTTP/TLS/QUIC sniffer，TUN 下的纯 IP 连接也能通过 SNI 还原域名后命中规则 |
+| 🏠 **VPS + 家宽 IP 双出口模板** | 新增 HomeIP SOCKS5 节点模板，可经 Hysteria2 VPS `dialer-proxy` 中转，AI 策略组可在 HomeIP/VPS/REJECT 间选择 |
+| 🚧 **海外 AI QUIC 阻断** | 仅对海外 AI 域名的 UDP/443 生成 REJECT 规则，促使浏览器回退 TCP/TLS，减少 HTTP/3/QUIC 绕过专属出口 |
+| 🧩 **合并逻辑更安全** | 使用 `upsertByName` 和去重合并，避免重复注入节点/策略组/规则，也不覆盖原配置已有的 TUN 排除项 |
 
 ### 详细变更
 
-**1. CF 风控 & 验证码域名分流（新增）**
+**1. DNS 与 sniffer 完整重构**
 
-问题：订阅规则常将 `challenges.cloudflare.com` 误分配到 `🐟 Copilot` 等规则，导致 CF Turnstile 验证码加载异常，部分海外网站无限循环人机验证。
+v3.0 将 DNS 策略明确拆成两层：海外 AI 域名保持 fake-ip，确保进入 `🤖 AI专属分流`；国内、私有、文献、教育、Steam 和验证码域名进入 `fake-ip-filter` 与 `nameserver-policy`，尽量使用系统 DNS 与真实 IP。
 
-方案：新增 `cfChallengeDomains` 数组（7 个域名），覆盖 Cloudflare Turnstile、CF Telemetry、Google reCAPTCHA 及 `gstatic.com` 依赖资源，统一走 `🤖 AI专属分流`（VPS 出口），规则置顶优先于订阅所有规则。
+同时启用 HTTP/TLS/QUIC 嗅探，TUN 模式下即使应用先连接 IP，也能尽量从 SNI 还原域名并命中域名规则。
 
 ```js
-const cfChallengeDomains = [
-  "challenges.cloudflare.com",      // Cloudflare Turnstile
-  "nel.cloudflare.com",             // CF 遥测（参与风控指纹）
-  "cloudflareinsights.com",         // CF 遥测
-  "recaptcha.net",                  // Google reCAPTCHA
-  "www.recaptcha.net",
-  "gstatic.com",                    // reCAPTCHA 依赖资源
-  "www.gstatic.com"
-];
+config.dns["enhanced-mode"] = "fake-ip";
+config.dns["fake-ip-filter"].push("geosite:cn", "geosite:private");
+config.dns["nameserver-policy"]["geosite:cn"] = "system";
 ```
 
-**2. 文献数据库扩展（v1 → v2）**
+**2. 双出口节点模板**
 
-新增 20+ 顶级学会及中型出版平台域名：
+公开模板保留两个可选节点：
 
-```
-PNAS (pnas.org) · 皇家学会 (royalsocietypublishing.org)
-生理学会 (physiology.org) · 微生物学会 (asm.org)
-综述期刊 (annualreviews.org) · 数学学会 (ams.org)
-经济学会 (aeaweb.org) · Karger · Hindawi
-De Gruyter · Emerald · 冷泉港 (cshlp.org / cshlpress.com)
-洛克菲勒出版社 (rupress.org)
-```
+- `AI-MyVPS`：Hysteria2 VPS 基础节点
+- `AI-HomeIP`：经 `AI-MyVPS` 中转的 SOCKS5 家宽 IP 节点，`udp: false`，避免 QUIC/UDP 泄漏
 
-v1 文献域名 ~70 个 → v2 文献域名 **~95 个**，覆盖从预印本（arxiv / biorxiv）到顶级期刊（Nature / Science / Cell / NEJM / Lancet / JAMA / PNAS）的完整学术链路。
+`🤖 AI专属分流` 默认包含 `AI-HomeIP`、`AI-MyVPS` 和 `REJECT`，可按自己的线路选择。
 
 **3. 规则优先级重组**
 
 ```
-v1:  局域网 → 教育 → 文献 → Steam → 进程 → 国产AI → 海外AI
-v2:  CF验证 ⚡ → 局域网 → 教育 → 文献 → Steam → 进程 → 国产AI → 海外AI
+v2:  CF验证 → 局域网 → 教育/文献/Steam → 国产AI → 海外AI
+v3:  局域网 → CF验证 → 教育/文献/Steam → 进程 → 国产AI → AI QUIC阻断 → 海外AI → AI IP兜底 → 国内兜底
 ```
 
-CF 风控规则升至最顶层，避免被订阅内 `DOMAIN-SUFFIX,challenges.cloudflare.com,🐟 Copilot` 等规则覆盖。
+局域网 IP 段优先直连；CF / reCAPTCHA 验证域名改为 DIRECT，与文献/校园主体流量同出口，减少验证码场景的 IP 指纹不一致。
 
 ---
 
@@ -100,15 +89,19 @@ CF 风控规则升至最顶层，避免被订阅内 `DOMAIN-SUFFIX,challenges.cl
 本脚本中的自建节点信息**已脱敏**：
 
 ```js
-server: "YOUR_SERVER_IP_HERE",
-password: "YOUR_PASSWORD_HERE",
+server: "YOUR_VPS_SERVER_IP_HERE",
+password: "YOUR_HYSTERIA2_PASSWORD_HERE",
+server: "YOUR_HOMEIP_SOCKS_SERVER_HERE",
+username: "YOUR_HOMEIP_USERNAME_HERE",
+password: "YOUR_HOMEIP_PASSWORD_HERE",
 ```
 
 在使用前，你需要任选一种方案：
 
-- **方案 A**：替换为你自己的 **Hysteria2** VPS 信息（默认模板）
-- **方案 B**：把节点注入改成 **其他协议**（SS / VMess / VLESS / Trojan 等，见下文模板）
-- **方案 C**：完全**不自建**，只用现用订阅里的节点（见下文"不想自建节点？"章节）
+- **方案 A**：只使用 **Hysteria2 VPS**，填写 `AI-MyVPS` 并在策略组中选择它
+- **方案 B**：使用 **VPS + 家宽 IP**，同时填写 `AI-MyVPS` 和 `AI-HomeIP`
+- **方案 C**：把节点注入改成 **其他协议**（SS / VMess / VLESS / Trojan 等，见下文模板）
+- **方案 D**：完全**不自建**，只用现用订阅里的节点（见下文"不想自建节点？"章节）
 
 > 🔐 **安全提示**：真实服务器信息切勿提交到任何公开仓库！
 
@@ -118,13 +111,14 @@ password: "YOUR_PASSWORD_HERE",
 
 | 场景 | 需求 | 解决方案 |
 |------|------|----------|
-| 🔒 CF 风控绕过 | Turnstile / reCAPTCHA 国别检测 | VPS 出口统一分流，置顶规则 |
+| 🔒 CF 风控绕过 | Turnstile / reCAPTCHA 国别检测 | 验证域名 DIRECT + 系统 DNS，压过订阅误匹配 |
 | 🎓 校园网 & 文献下载 | 需走校园 IP 出口才能识别授权 | 域名直连 + 系统 DNS |
-| 🤖 海外 AI 服务 | ChatGPT / Claude / Gemini 等被封锁 | 走自建或订阅节点 |
+| 🤖 海外 AI 服务 | ChatGPT / Claude / Gemini 等被封锁 | fake-ip + AI 专属出口 |
+| 🚧 AI QUIC 防漏 | HTTP/3/QUIC 可能绕过策略组 | 海外 AI UDP/443 精准 REJECT，回退 TCP/TLS |
 | 🐉 国产 AI | DeepSeek / Kimi / 豆包 等 | 直连，避免绕路 |
 | 🎮 Steam & 游戏加速器 | 避免与 TUN 冲突 | 进程排除 + 域名直连 |
 | 🏠 内网设备 | 访问 NAS / 打印机 / 路由器 | 局域网 CIDR 直连 |
-| 🔒 隐私保护 | 防 IPv6 泄漏、hosts 污染 | 强制关闭 IPv6 DNS |
+| 🔒 隐私保护 | 防 IPv6 泄漏、hosts 污染、fake-ip 抖动 | IPv6 DNS 关闭 + fake-ip 映射持久化 |
 
 ---
 
@@ -145,7 +139,8 @@ password: "YOUR_PASSWORD_HERE",
 
 根据你的情况任选其一：
 
-- ✅ **用 Hysteria2 VPS**：替换脚本中的 `YOUR_SERVER_IP_HERE` 和 `YOUR_PASSWORD_HERE`
+- ✅ **用 Hysteria2 VPS**：替换脚本中的 `YOUR_VPS_SERVER_IP_HERE` 和 `YOUR_HYSTERIA2_PASSWORD_HERE`
+- 🏠 **用家宽 IP**：继续填写 `YOUR_HOMEIP_SOCKS_SERVER_HERE`、`YOUR_HOMEIP_USERNAME_HERE` 和 `YOUR_HOMEIP_PASSWORD_HERE`
 - 🔁 **用其他协议**：参考下文 [切换到其他协议](#-切换到其他协议ss--vmess--vless--trojan-等)
 - 🚫 **不自建**：参考下文 [不想自建节点](#-不想自建节点直接使用订阅节点)
 
@@ -167,20 +162,21 @@ password: "YOUR_PASSWORD_HERE",
 ## 🏗️ 架构概览
 
 ```
-┌──────────────────────────────────────────────────┐
-│         全局覆盖脚本（main 函数）v2.0             │
-├──────────────────────────────────────────────────┤
-│  1. 基础优化（store-selected / DNS）              │
-│  2. TUN 排除进程（游戏加速器）                     │
-│  3. 注入自建节点（默认 Hysteria2）                 │
-│  4. 创建 AI 专属策略组                             │
-│  5. 域名清单定义（海外AI / 国产AI / 教育 / 文献）   │
-│  6. CF 风控域名分流（🆕）                          │
-│  7. Steam & 加速器直连（域名 + 进程名）             │
-│  8. 局域网保护（CIDR 直连）                        │
-│  9. 规则优先级合并 → 订阅规则                      │
-│ 10. DNS 增强（fake-ip-filter + nameserver-policy） │
-└──────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────┐
+│          全局覆盖脚本（main 函数）v3.0               │
+├─────────────────────────────────────────────────────┤
+│  1. 基础结构保护 + 去重/合并/upsert 工具函数          │
+│  2. 基础优化（store-selected / fake-ip / 指纹）       │
+│  3. sniffer 域名嗅探（HTTP / TLS / QUIC）             │
+│  4. DNS fake-ip 分层与系统 DNS 兜底                   │
+│  5. TUN 排除进程合并                                  │
+│  6. 注入 VPS + HomeIP 双节点模板                      │
+│  7. 创建 AI 专属策略组                                │
+│  8. 域名清单定义（海外AI / 国产AI / 教育 / 文献）      │
+│  9. 海外 AI QUIC / HTTP3 阻断                         │
+│ 10. 规则优先级合并并去重                              │
+│ 11. fake-ip-filter + nameserver-policy 增强           │
+└─────────────────────────────────────────────────────┘
 ```
 
 ---
@@ -191,6 +187,7 @@ password: "YOUR_PASSWORD_HERE",
 
 ```js
 config.profile["store-selected"] = true;  // 记住节点选择
+config.profile["store-fake-ip"] = true;   // 持久化 fake-ip 映射
 config.dns["use-system-hosts"] = false;   // 防 hosts 污染
 config.dns.ipv6 = false;                  // 禁用 IPv6 DNS，防泄漏
 ```
@@ -205,14 +202,14 @@ config.dns.ipv6 = false;                  // 禁用 IPv6 DNS，防泄漏
 
 ### 自建节点注入
 
-通过 `unshift` 把自建节点塞到节点列表最前面，方便快速选择。默认使用 Hysteria2，其他协议见下文。
+通过 `upsertByName` 注入或更新节点，避免多次应用脚本后重复生成节点。默认包含 Hysteria2 VPS 与经 VPS 中转的 HomeIP SOCKS5 模板，其他协议见下文。
 
 ### AI 专属策略组
 
 ```
 名称：🤖 AI专属分流
 类型：select（手动选择）
-可选：AI-MyVPS / REJECT
+可选：AI-HomeIP / AI-MyVPS / REJECT
 ```
 
 > 💡 **不含 DIRECT**，避免因误选导致 AI 请求走本地泄漏身份；`REJECT` 提供紧急熔断。
@@ -221,33 +218,33 @@ config.dns.ipv6 = false;                  // 禁用 IPv6 DNS，防泄漏
 
 **为什么需要？** 订阅规则常将 `challenges.cloudflare.com` 误分配到 `🐟 Copilot` 等不相关的规则，导致 CF Turnstile 验证码加载异常，部分海外网站出现无限循环人机验证。
 
-**解决方案：** 将 Cloudflare Turnstile / Google reCAPTCHA 及其依赖资源从订阅规则中独立出来，统一走 VPS 出口，且规则**置顶**（高于局域网）确保不会被订阅规则覆盖。
+**解决方案：** 将 Cloudflare Turnstile / Google reCAPTCHA 从订阅规则中独立出来，统一 DIRECT + system DNS，且规则前置确保不会被订阅规则覆盖。这样文献库、校园站点和验证码资源保持同一主体出口，减少 IP 指纹不一致。
 
 | 域名 | 用途 |
 |------|------|
 | `challenges.cloudflare.com` | Cloudflare Turnstile 验证 |
 | `nel.cloudflare.com` / `cloudflareinsights.com` | CF 遥测（参与风控指纹） |
 | `recaptcha.net` / `www.recaptcha.net` | Google reCAPTCHA 服务 |
-| `gstatic.com` / `www.gstatic.com` | reCAPTCHA 静态资源依赖 |
 
 ### 域名分流清单
 
 | 列表 | 走向 | 域名数 | 说明 |
 |------|------|--------|------|
-| `cfChallengeDomains` 🆕 | 🤖 AI专属分流 | 7 | CF Turnstile / reCAPTCHA 风控域名 |
-| `aiDomainsOverseas` | 🤖 AI专属分流 | ~40 | OpenAI / Claude / Gemini / Grok / Perplexity / HuggingFace 等 |
+| `cfChallengeDomains` | DIRECT + 系统 DNS | 5 | CF Turnstile / reCAPTCHA 风控域名 |
+| `aiDomainsOverseas` | 🤖 AI专属分流 | ~60 | OpenAI / Claude / Gemini / Grok / Perplexity / HuggingFace 等 |
+| `aiQuicRejectRules` | REJECT | 跟随海外 AI 域名 | 仅阻断海外 AI UDP/443，促使回退 TCP/TLS |
 | `aiDomainsCN` | DIRECT | ~35 | DeepSeek / Kimi / 通义 / 文心 / 豆包 / 混元 等 |
 | `eduDomains` | DIRECT + 系统 DNS | 5 | edu.cn / cernet 等教育网 |
 | `literatureDomains` | DIRECT + 系统 DNS | ~95 | 知网、万方、WOS、Elsevier、Springer、IEEE、PubMed、PNAS、Cell、JAMA 等 |
-| `steamDomains` | DIRECT | 9 | Steam 平台域名（含 `DOMAIN-KEYWORD,steam`） |
-| `directProcesses` | DIRECT | 17 | 游戏加速器进程名 |
+| `steamDomains` | DIRECT + 系统 DNS | 9 | Steam 平台域名 |
+| `directProcesses` | DIRECT | 20+ | Steam 与主流游戏加速器进程名 |
 | `lanCIDRs` / `lanCIDRs6` | DIRECT（no-resolve） | 6 / 3 | 内网 IPv4/IPv6 段 |
 
 ### DNS 增强
 
 ```
-fake-ip-filter     → 教育 / 文献 / Steam 域名跳过 fake-ip
-nameserver-policy  → 教育 / 文献域名强制使用「系统 DNS」
+fake-ip-filter     → 国内 / 私有 / 教育 / 文献 / Steam / 验证码域名跳过 fake-ip
+nameserver-policy  → 国内 / 私有 / 教育 / 文献 / Steam / 验证码域名强制使用「系统 DNS」
 ```
 
 > ⚠️ **关键点**：文献库通过 IP 识别校园授权，必须让校园网 DHCP 下发的 DNS 去解析，拿到校内解析结果，出口才能被识别为校内 IP。
@@ -256,35 +253,50 @@ nameserver-policy  → 教育 / 文献域名强制使用「系统 DNS」
 
 ## 📑 规则优先级顺序
 
-脚本使用 `concat` 把自定义规则放在订阅规则**最前面**，压过订阅尾部的 `MATCH` 兜底规则：
+脚本使用 `unique(customRules.concat(config.rules))` 把自定义规则放在订阅规则**最前面**并去重，压过订阅尾部的 `MATCH` 兜底规则：
 
 ```
-① CF 风控 & 验证码 → 🤖 AI专属分流   🆕 置顶！压过订阅规则
-② 局域网 IP-CIDR（no-resolve）
-③ 教育网域名 DIRECT
-④ 文献库域名 DIRECT
-⑤ Steam 域名 DIRECT + DOMAIN-KEYWORD,steam
-⑥ 进程名直连（Steam + 加速器）
-⑦ 国产 AI DIRECT
-⑧ 海外 AI → 🤖 AI专属分流
-⑨ ────── 以下为订阅原规则 ──────
+① 局域网 IP-CIDR / IP-CIDR6（no-resolve）
+② CF 风控 & 验证码 DIRECT
+③ 教育网 / 文献库 / Steam 域名 DIRECT
+④ 进程名直连（Steam + 加速器）
+⑤ 国产 AI DIRECT
+⑥ 海外 AI UDP/443 REJECT（阻断 QUIC / HTTP3）
+⑦ 海外 AI TCP/TLS → 🤖 AI专属分流
+⑧ AI IP 段兜底 → 🤖 AI专属分流
+⑨ GEOSITE/GEOIP 国内兜底 DIRECT
+⑩ ────── 以下为订阅原规则 ──────
 ```
 
 ---
 
 ## 🛠️ 自建节点配置
 
-脚本默认使用 **Hysteria2** 协议模板：
+脚本默认包含两个节点模板：**Hysteria2 VPS** 和 **HomeIP SOCKS5**。只使用 VPS 时，填写 `AI-MyVPS` 后在策略组里选择 `AI-MyVPS` 即可；使用家宽 IP 时，再填写 `AI-HomeIP`。
 
 ```js
-config.proxies.unshift({
-  name: "AI-MyVPS",
+const VPS_NODE = "AI-MyVPS";
+const HOMEIP_NODE = "AI-HomeIP";
+
+upsertByName(config.proxies, {
+  name: VPS_NODE,
   type: "hysteria2",
-  server: "YOUR_SERVER_IP_HERE",
+  server: "YOUR_VPS_SERVER_IP_HERE",
   port: 8443,
-  password: "YOUR_PASSWORD_HERE",
+  password: "YOUR_HYSTERIA2_PASSWORD_HERE",
   sni: "bing.com",
   "skip-cert-verify": true
+});
+
+upsertByName(config.proxies, {
+  name: HOMEIP_NODE,
+  type: "socks5",
+  server: "YOUR_HOMEIP_SOCKS_SERVER_HERE",
+  port: 443,
+  username: "YOUR_HOMEIP_USERNAME_HERE",
+  password: "YOUR_HOMEIP_PASSWORD_HERE",
+  udp: false,
+  "dialer-proxy": VPS_NODE
 });
 ```
 
@@ -292,34 +304,34 @@ config.proxies.unshift({
 
 | 字段 | 占位符 / 默认值 | 说明 | 是否必填 |
 |------|----------------|------|---------|
-| `name` | `AI-MyVPS` | 节点显示名，可自定义 | ✅ |
-| `type` | `hysteria2` | **协议类型，不可省略** | ✅ |
-| `server` | `YOUR_SERVER_IP_HERE` | VPS 的 IP 或域名 | ✅ |
-| `port` | `8443` | 端口号，按服务端配置填写 | ✅ |
-| `password` | `YOUR_PASSWORD_HERE` | 认证密码 | ✅ |
-| `sni` | `bing.com` | TLS 伪装域名，可自定义 | ⚠️ 建议 |
-| `skip-cert-verify` | `true` | 自签证书填 `true`，正式证书填 `false` | ⚠️ 建议 |
+| `AI-MyVPS.server` | `YOUR_VPS_SERVER_IP_HERE` | VPS 的 IP 或域名 | ✅ |
+| `AI-MyVPS.password` | `YOUR_HYSTERIA2_PASSWORD_HERE` | Hysteria2 认证密码 | ✅ |
+| `AI-MyVPS.sni` | `bing.com` | TLS 伪装域名，可自定义 | ⚠️ 建议 |
+| `AI-HomeIP.server` | `YOUR_HOMEIP_SOCKS_SERVER_HERE` | 家宽 SOCKS5 服务器 IP 或域名 | 仅家宽方案 |
+| `AI-HomeIP.username` | `YOUR_HOMEIP_USERNAME_HERE` | 家宽 SOCKS5 用户名 | 仅家宽方案 |
+| `AI-HomeIP.password` | `YOUR_HOMEIP_PASSWORD_HERE` | 家宽 SOCKS5 密码 | 仅家宽方案 |
+| `AI-HomeIP.dialer-proxy` | `AI-MyVPS` | 先经 VPS 隧道连接 HomeIP | 仅家宽方案 |
 
 ### 替换步骤
 
-1. 打开 `override.js`，定位到 `config.proxies.unshift({ ... })` 代码块
-2. 把 `YOUR_SERVER_IP_HERE` 替换为你的 VPS 公网 IP 或域名
-3. 把 `YOUR_PASSWORD_HERE` 替换为 Hysteria2 认证密码
-4. 按需调整 `port` / `sni` / `skip-cert-verify`
+1. 打开 `override.js`，定位到 `AI-MyVPS` 和 `AI-HomeIP` 两个节点模板
+2. 把 `YOUR_VPS_SERVER_IP_HERE` 替换为你的 VPS 公网 IP 或域名
+3. 把 `YOUR_HYSTERIA2_PASSWORD_HERE` 替换为 Hysteria2 认证密码
+4. 如使用家宽 IP，继续替换 `YOUR_HOMEIP_*` 三个占位符
 5. 保存 → 订阅页「重新应用」
 
 ---
 
 ## 🔁 切换到其他协议（SS / VMess / VLESS / Trojan 等）
 
-脚本默认模板仅适用于 **Hysteria2**。如果你的服务器使用其他协议，请**完整替换** `config.proxies.unshift({ ... })` 这段代码为下方对应模板。
+脚本默认 VPS 模板使用 **Hysteria2**。如果你的服务器使用其他协议，请**完整替换** `upsertByName(config.proxies, { ... })` 里的 `AI-MyVPS` 节点代码为下方对应模板。
 
 > 💡 所有模板都保持 `name: "AI-MyVPS"`，这样 AI 策略组无需修改即可识别。
 
 ### 📦 Shadowsocks (SS)
 
 ```js
-config.proxies.unshift({
+upsertByName(config.proxies, {
   name: "AI-MyVPS",
   type: "ss",
   server: "YOUR_SERVER_IP",
@@ -333,7 +345,7 @@ config.proxies.unshift({
 ### 📦 ShadowsocksR (SSR)
 
 ```js
-config.proxies.unshift({
+upsertByName(config.proxies, {
   name: "AI-MyVPS",
   type: "ssr",
   server: "YOUR_SERVER_IP",
@@ -348,7 +360,7 @@ config.proxies.unshift({
 ### 📦 VMess
 
 ```js
-config.proxies.unshift({
+upsertByName(config.proxies, {
   name: "AI-MyVPS",
   type: "vmess",
   server: "YOUR_SERVER_IP",
@@ -369,7 +381,7 @@ config.proxies.unshift({
 ### 📦 VLESS
 
 ```js
-config.proxies.unshift({
+upsertByName(config.proxies, {
   name: "AI-MyVPS",
   type: "vless",
   server: "YOUR_SERVER_IP",
@@ -388,7 +400,7 @@ config.proxies.unshift({
 ### 📦 Trojan
 
 ```js
-config.proxies.unshift({
+upsertByName(config.proxies, {
   name: "AI-MyVPS",
   type: "trojan",
   server: "YOUR_SERVER_IP",
@@ -402,7 +414,7 @@ config.proxies.unshift({
 ### 📦 Hysteria v1
 
 ```js
-config.proxies.unshift({
+upsertByName(config.proxies, {
   name: "AI-MyVPS",
   type: "hysteria",
   server: "YOUR_SERVER_IP",
@@ -419,7 +431,7 @@ config.proxies.unshift({
 ### 📦 TUIC v5
 
 ```js
-config.proxies.unshift({
+upsertByName(config.proxies, {
   name: "AI-MyVPS",
   type: "tuic",
   server: "YOUR_SERVER_IP",
@@ -435,7 +447,7 @@ config.proxies.unshift({
 ### 📦 WireGuard
 
 ```js
-config.proxies.unshift({
+upsertByName(config.proxies, {
   name: "AI-MyVPS",
   type: "wireguard",
   server: "YOUR_SERVER_IP",
@@ -457,27 +469,38 @@ config.proxies.unshift({
 
 ### 第 1 步：删除节点注入代码
 
-在 `override.js` 中找到并**整段删除**：
+在 `override.js` 中找到并**整段删除** `AI-MyVPS` 和 `AI-HomeIP` 两个节点注入代码：
 
 ```js
-config.proxies.unshift({
-  name: "AI-MyVPS",
+upsertByName(config.proxies, {
+  name: VPS_NODE,
   type: "hysteria2",
-  server: "YOUR_SERVER_IP_HERE",
+  server: "YOUR_VPS_SERVER_IP_HERE",
   port: 8443,
-  password: "YOUR_PASSWORD_HERE",
+  password: "YOUR_HYSTERIA2_PASSWORD_HERE",
   sni: "bing.com",
   "skip-cert-verify": true
+});
+
+upsertByName(config.proxies, {
+  name: HOMEIP_NODE,
+  type: "socks5",
+  server: "YOUR_HOMEIP_SOCKS_SERVER_HERE",
+  port: 443,
+  username: "YOUR_HOMEIP_USERNAME_HERE",
+  password: "YOUR_HOMEIP_PASSWORD_HERE",
+  udp: false,
+  "dialer-proxy": VPS_NODE
 });
 ```
 
 ### 第 2 步：修改 AI 策略组
 
-把 `proxies: ["AI-MyVPS", "REJECT"]` 改为你订阅中的节点名：
+把策略组里的 `proxies` 改为你订阅中的节点名：
 
 ```js
-config["proxy-groups"].unshift({
-  name: "🤖 AI专属分流",
+upsertByName(config["proxy-groups"], {
+  name: AI_GROUP,
   type: "select",
   proxies: [
     "你订阅里的节点名-1",
@@ -531,9 +554,7 @@ const aiDomainsOverseas = [
 
 ### 新增一个游戏加速器
 
-需要在**两处**同步添加进程名：
-1. `config.tun["exclude-process-name"]`（TUN 层排除）
-2. `directProcesses`（规则层直连）
+在 `directProcesses` 中添加进程名即可。脚本会同时把它合并进 TUN 排除进程，并生成 `PROCESS-NAME` 直连规则。
 
 ### 切换 AI 出口节点
 
@@ -541,7 +562,7 @@ const aiDomainsOverseas = [
 
 ### 更换自建 VPS
 
-修改脚本中 `unshift` 部分的 `server` / `port` / `password` 字段。如需切换协议，参考上文 [切换到其他协议](#-切换到其他协议ss--vmess--vless--trojan-等)。
+修改脚本中 `AI-MyVPS` 节点的 `server` / `port` / `password` 字段。如需切换协议，参考上文 [切换到其他协议](#-切换到其他协议ss--vmess--vless--trojan-等)。
 
 ---
 
@@ -564,10 +585,10 @@ const aiDomainsOverseas = [
 
 ### ❌ CF Turnstile 验证码无限循环 🆕
 
-**原因**：`challenges.cloudflare.com` 被订阅规则误分配到国内出口，CF 检测到国别不一致导致拒绝。
+**原因**：`challenges.cloudflare.com` 被订阅规则误分配到不合适的出口，或验证码资源与主体站点出口不一致。
 **排查**：
-1. Clash 的 **连接** 页搜索 `challenges.cloudflare`，确认是否匹配到 `🤖 AI专属分流`
-2. 确认 `🤖 AI专属分流` 选择了海外节点（非 REJECT）
+1. Clash 的 **连接** 页搜索 `challenges.cloudflare`，确认是否匹配到 `DIRECT`
+2. 确认当前网络出口与正在访问的主体站点场景一致
 3. 若仍异常，检查订阅规则中是否有 `DOMAIN,challenges.cloudflare.com` 覆盖了脚本规则（脚本已置顶，理论上不会）
 
 ### ❌ 节点注入失败 / 启动报错
