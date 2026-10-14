@@ -141,3 +141,10 @@ dist
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 .vite/
+
+# Private configuration copies must not enter the public repository
+*.private.js
+*.local.js
+/private/
+/Clash Verge rev配置（Script）*版本.txt
+/Clash配置说明.html
